@@ -230,7 +230,7 @@ func (pf *PortForwarder) forward() error {
 	select {
 	case <-pf.stopChan:
 	case <-pf.streamConn.CloseChan():
-		runtime.HandleError(errors.New("lost connection to pod"))
+		return fmt.Errorf("lost connection to pod")
 	}
 
 	return nil
