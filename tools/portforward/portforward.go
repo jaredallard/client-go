@@ -28,7 +28,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
@@ -388,16 +388,29 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		}
 	}()
 
-	// wait for either a local->remote error or for copying from remote->local to finish
-	select {
-	case <-remoteDone:
-	case <-localError:
+errorLoop:
+	for {
+		select {
+		case err = <-errorChan:
+			if err != nil {
+				break errorLoop
+			}
+
+			// if we didn't get an error, then we can
+			// continue to wait until we get a local->remote error
+			// or a remote->local error
+		case <-remoteDone:
+			break errorLoop
+		case <-localError:
+			break errorLoop
+		}
 	}
 
-	// always expect something on errorChan (it may be nil)
-	err = <-errorChan
 	if err != nil {
 		runtime.HandleError(err)
+
+		// kill the connection
+		pf.streamConn.Close()
 	}
 }
 
